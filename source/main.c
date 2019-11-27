@@ -1,43 +1,55 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <string.h>
 #ifdef _SIMULATE_
 #include "simAVRHeader.h"
 #endif
 #include "keypad.h"
 #include "tasks.h"
 #include "timer.h"
+#include "io.c"
 
 typedef enum keypad_states {wait, buttonPress};
+typedef enum display_keypad_states {dispChar};
 
 int keypadTick(int state);
+int displayTick( int state);
 
-static task task1;
-task *tasks[] = { &task1};
-const unsigned short numTasks = sizeof(tasks) / sizeof(task*);
+#define SCREEN_WIDTH 16
 
 int main(void) {
-	DDRB = 0xFF; PORTB = 0x00;
 	DDRA = 0xF0; PORTA = 0x0F;
+	DDRB = 0xFF; PORTB = 0x00;
+	DDRC = 0xFF; PORTC = 0x00;
+	DDRD = 0xFF; PORTD = 0x00;
 
 	unsigned char i;
+	static task task1, task2;
+	task *tasks[] = { &task1, &task2};
+	const unsigned short numTasks = sizeof(tasks) / sizeof(task*);
 
 	task1.state = wait;
 	task1.period = 50;
-	task1.elapsedTime = task1.period;
+	task1.elapsedTime = task2.period;
 	task1.TickFct = &keypadTick;
+
+	task2.state = dispChar;
+	task2.period = 100;
+	task2.elapsedTime = task1.period;
+	task2.TickFct = &displayTick;
 
 	unsigned long GCD = tasks[0]->period;
 	for (i = 1; i < numTasks; ++i) {
 		GCD = findGCD(GCD, tasks[i]->period);
 	}
 
+	LCD_init();
+
 	TimerSet(GCD);
 	TimerOn();
 
 	while(1) {
-
-
 		for (i = 0; i < numTasks; i++) {
 			if (tasks[i]->elapsedTime == tasks[i]->period) {
 				tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);
@@ -45,7 +57,6 @@ int main(void) {
 			}
 			tasks[i]->elapsedTime += GCD;
 		}
-
 		while(!TimerFlag);
 		TimerFlag = 0;
 	}
@@ -53,10 +64,13 @@ int main(void) {
 	return 0;
 }
 
+//------------------------ SHARED VARIABLES ------------------------------------
+static unsigned char x;
+
+//------------------------------------------------------------------------------
 
 int keypadTick(int state) {
-	unsigned char x = GetKeypadKey();
-
+	x = GetKeypadKey();
 	switch (state) {
 		case wait:
 		if (x == '\0') { state = wait; }
@@ -102,5 +116,20 @@ int keypadTick(int state) {
 	}
 
 
+	return state;
+}
+
+
+int displayTick(int state) {
+
+	switch (state) {
+		case dispChar:
+			LCD_Cursor(1);
+			if (x != '\0') {
+				LCD_WriteData(x);
+			}
+			break;
+
+	}
 	return state;
 }
