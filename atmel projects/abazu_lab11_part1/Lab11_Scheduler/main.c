@@ -18,7 +18,7 @@ const unsigned short numTasks = sizeof(tasks) / sizeof(task*);
 
 int main(void) {
 	DDRB = 0xFF; PORTB = 0x00;
-	DDRC = 0xF0; PORTC = 0x0F;
+	DDRA = 0xF0; PORTA = 0x0F;
 
 	unsigned char i;
 
